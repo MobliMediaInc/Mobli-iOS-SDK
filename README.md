@@ -1,5 +1,4 @@
 
-
 Mobli iOS SDK v.1.0
 05/2012 Mobli Media inc.
 
@@ -7,15 +6,11 @@ Mobli iOS SDK v.1.0
 What is the Mobli iOS SDK?
 
 The developer’s iOS SDK provides support for accessing and utilizing Mobli’s API. This access includes authentication via the OAuth 2.0 protocol and various REST requests.
-The SDK is open source and is available on GitHub.
 
 SDK Contents
 
 MobliConnect.h
 Header file used to reference the SDK’s interface files and constants.
-
-MobliConstants.h
-Header file used to store SDK related constants (URLs, Client ID, Client secret, etc.)
 
 Mobli.h
 Main Mobli interface for interacting with the Mobli developer API. Provides methods to log in and log out a user, and to make requests using the REST API. Implementation in Mobli.m.
@@ -37,6 +32,7 @@ Installation
 Usage
 
 #import MobliConnect.h to whatever class will be implementing the SDK methods and/or protocols
+or just #import in the project pch file.
 
 Perform all the actions (authentication, API requests) through the Mobli.h interface.
 
