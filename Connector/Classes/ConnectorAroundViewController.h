@@ -10,4 +10,6 @@
 
 @interface ConnectorAroundViewController : ConnectorFeedViewController
 
+- (void)getLocation;
+
 @end

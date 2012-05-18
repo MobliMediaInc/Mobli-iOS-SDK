@@ -8,31 +8,6 @@
 
 #import "ConnectorPopularViewController.h"
 
-@interface ConnectorPopularViewController ()
-
-@end
-
-
-@implementation ConnectorPopularViewController (Private)
-
-- (void)getFeaturedMediaFeed {
-
-    // Setting request parameters. For more info see 
-    NSMutableDictionary *featuredMediaParams = [NSMutableDictionary dictionaryWithObjectsAndKeys:
-                                                @"1",@"page",
-                                                @"21",@"max_per_page",
-                                                @"21",@"max_results",
-                                                @"1",@"noch",
-                                                @"1",@"nopl",
-                                                @"1",@"nocy",
-                                                @"1",@"noct",
-                                                nil];
-        
-
-    [self get:@"explore/FeaturedMedia" params:featuredMediaParams delegate:self];
-}
-
-@end
 @implementation ConnectorPopularViewController
 
 - (id)initWithNibName:(NSString *)nibNameOrNil bundle:(NSBundle *)nibBundleOrNil
@@ -60,7 +35,6 @@
     self.leftBarButton.titleLabel.font = refreshFont;
     self.leftBarButton.titleLabel.textAlignment = UITextAlignmentCenter;
     [self.navBar addSubview:self.leftBarButton];
-    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(getFeaturedMediaFeed) name:@"ACCESS_TOKEN_EXISTS" object:nil];
 
 
 }
@@ -74,5 +48,23 @@
 - (NSInteger)tableView:(UITableView *)aTableView numberOfRowsInSection:(NSInteger)aSection {
     return 7;
 }
+
+- (void)getFeaturedMediaFeed {
+    
+    // Setting request parameters. For more info see 
+    NSMutableDictionary *featuredMediaParams = [NSMutableDictionary dictionaryWithObjectsAndKeys:
+                                                @"1",@"page",
+                                                @"21",@"max_per_page",
+                                                @"21",@"max_results",
+                                                @"1",@"noch",
+                                                @"1",@"nopl",
+                                                @"1",@"nocy",
+                                                @"1",@"noct",
+                                                nil];
+    
+    
+    [self get:@"explore/featuredMedia" params:featuredMediaParams delegate:self];
+}
+
 
 @end

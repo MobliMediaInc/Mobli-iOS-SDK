@@ -1,34 +1,44 @@
-/*
- * Copyright 2011 Mobli
+
+
+/* Copyright 2012 Mobli Media inc.
+ *
+ *  The following code is derived from Facebook iOS sdk.
+ *  Modifications were made to all original methods by Ariel Krieger, Mobli, 05/16/2012
+ *
+ 
+ 
+ ********** Original Facebook License *************************************
+ 
+ * Copyright 2010 Facebook
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  *    http://www.apache.org/licenses/LICENSE-2.0
-
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */
+ 
+ ********** Original Facebook License *************************************/
+
+
 
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 
+
+#define kMobliDialogBaseURL                     @"https://oauth.mobli.com/"
+#define kMobliRestserverBaseURL                 @"https://api.mobli.com/"
+
 @protocol MobliRequestDelegate;
 
-enum {
-    kMobliRequestStateReady,
-    kMobliRequestStateLoading,
-    kMobliRequestStateComplete,
-    kMobliRequestStateError
-};
-typedef NSUInteger MobliRequestState;
 
 /**
- * Do not use this interface directly, instead, use method in Facebook.h
+ * Do not use this interface directly, instead, use method in Mobli.h
  */
 @interface MobliRequest : NSObject {
     id<MobliRequestDelegate>                    _delegate;
@@ -37,10 +47,7 @@ typedef NSUInteger MobliRequestState;
     NSMutableDictionary                         *_params;
     NSURLConnection                             *_connection;
     NSMutableData                               *_responseText;
-    MobliRequestState                           _state;
     NSError                                     *_error;
-    BOOL                                        _sessionDidExpire;
-
 }
 
 
@@ -52,7 +59,7 @@ typedef NSUInteger MobliRequestState;
 @property(nonatomic,copy) NSString              *url;
 
 /**
- * The API method which will be called.
+ * The http method for the request.
  */
 @property(nonatomic,copy) NSString              *httpMethod;
 
@@ -70,8 +77,6 @@ typedef NSUInteger MobliRequestState;
 @property(nonatomic,retain)     NSMutableDictionary *params;
 @property(nonatomic,assign)     NSURLConnection     *connection;
 @property(nonatomic,assign)     NSMutableData       *responseText;
-@property(nonatomic,readonly)   MobliRequestState   state;
-@property(nonatomic,readonly)   BOOL                sessionDidExpire;
 
 /**
  * Error returned by the server in case of request's failure (or nil otherwise).
@@ -90,9 +95,9 @@ typedef NSUInteger MobliRequestState;
                              delegate:(id<MobliRequestDelegate>)delegate
                            requestURL:(NSString *) url 
                                  name:(NSString *)aRequestName;
-- (BOOL) loading;
+- (BOOL)loading;
 
-- (void) connect;
+- (void)connect;
 
 @end
 

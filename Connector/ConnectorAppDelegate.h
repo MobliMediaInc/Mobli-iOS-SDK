@@ -9,7 +9,7 @@
 #import <UIKit/UIKit.h>
 #import "MobliConnect.h"
 
-@interface ConnectorAppDelegate : UIResponder <UIApplicationDelegate, UITabBarControllerDelegate, MobliRequestDelegate>
+@interface ConnectorAppDelegate : UIResponder <UIApplicationDelegate, UITabBarControllerDelegate, MobliRequestDelegate, MobliSessionDelegate>
 
 @property (strong, nonatomic) UIWindow *window;
 @property (strong, nonatomic) UITabBarController *tabBarController;

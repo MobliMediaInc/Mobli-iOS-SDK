@@ -8,7 +8,6 @@
 
 #import "ConnectorNotificationsViewController.h"
 #import "ConnectorNotificationCell.h"
-#import "MobliConnect.h"
 #import "ConnectorAppDelegate.h"
 
 @interface ConnectorNotificationsViewController ()

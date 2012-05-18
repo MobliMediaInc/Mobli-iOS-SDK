@@ -10,4 +10,6 @@
 
 @interface ConnectorPopularViewController : ConnectorFeedViewController
 
+- (void)getFeaturedMediaFeed;
+
 @end

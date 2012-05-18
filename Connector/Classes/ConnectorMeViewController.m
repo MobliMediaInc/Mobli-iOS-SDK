@@ -9,7 +9,6 @@
 #import "ConnectorMeViewController.h"
 #import "ConnectorAppDelegate.h"
 #import "ConnectorNotificationsViewController.h"
-#import <MobileCoreServices/UTCoreTypes.h>
 
 
 @interface ConnectorMeViewController ()
@@ -46,15 +45,6 @@
 // Initializing the camera
 - (void)actionCameraSelected;
 
-// UI change for when user is logged in
-- (void)showLoggedIn;
-
-// UI change for when user is logged out
-- (void)showLoggedOut:(BOOL)clearInfo;
-
-// Method for initiating an API request for the user's last 24 medias
-- (void)getUserMedia; 
-
 // Adding the text field as an input accessory view to the keyboard
 - (void)keyboardWillShow:(NSNotification *)notification;
 - (void)keyboardWillHide:(NSNotification *)notification;
@@ -86,30 +76,14 @@
 
 - (void)loginWithMobli {
     ConnectorAppDelegate *delegate = [ConnectorAppDelegate current];
-    
-    // Check and retrieve authorization information. Saving to NSUserDefaults is NOT secure and should not be used in your app.
-    // Some form of encrypted keychain is recommended.
-    
+    // permissions represent the selected scopes the user is requesting (see Mobli.m)
+    NSArray *permissions =  [NSArray arrayWithObjects:@"shared",@"basic",@"advanced", nil];
     
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-    if ([defaults objectForKey:@"MobliAccessTokenKey"]) {
-        delegate.mobli.accessToken = [defaults objectForKey:@"MobliAccessTokenKey"];
-    }
-    if ([defaults objectForKey:@"MobliExpirationDateKey"]) {
-        delegate.mobli.expirationDate = [defaults objectForKey:@"MobliExpirationDateKey"];
-    }
-    if ([defaults objectForKey:@"MobliUserID"]) {
-        delegate.mobli.userID = [defaults objectForKey:@"MobliUserID"];
-    }
+    [defaults setValue:permissions forKey:@"MobliUserPermissions"];
+    [defaults synchronize];
     
-    if (![delegate.mobli isSessionValid]) {
-        [delegate mobli].sessionDelegate = self;
-        // permissions represent the selected scopes the user is requesting (see Mobli.m)
-        NSArray *permissions =  [NSArray arrayWithObjects:@"shared",@"basic",@"advanced", nil];
-        [delegate.mobli loginWithPermissions:permissions asGuest:NO withDelegate:nil];
-    } else {
-        [self showLoggedIn];
-    }
+    [delegate.mobli loginWithPermissions:permissions]; 
 }
 
 - (void)logout {
@@ -117,7 +91,7 @@
     [self.tableView reloadData];
     [self.tableView scrollsToTop];
     ConnectorAppDelegate *delegate = [ConnectorAppDelegate current];
-    [delegate.mobli logout:self];
+    [delegate.mobli logout:delegate];
 }
 
 - (void)uploadToMobli {
@@ -136,12 +110,10 @@
 }
 
 - (void)actionAPISelected {
-    ConnectorAppDelegate *delegate = [ConnectorAppDelegate current];
     NSString *mediaCaption = [self.uploadedMediaInfo valueForKey:@"text"];
     UIImage *img = [self.uploadedMediaInfo valueForKey:UIImagePickerControllerOriginalImage];
     
     NSMutableDictionary *uploadMediaParams = [NSMutableDictionary dictionaryWithObjectsAndKeys:
-                                              delegate.mobli.userID,        @"owner_id",
                                               @"jpg",                       @"extension",
                                               mediaCaption,                 @"text",
                                               nil];
@@ -158,11 +130,6 @@
     UIImagePickerController *picker = [[UIImagePickerController alloc] init];
     picker.sourceType = UIImagePickerControllerSourceTypePhotoLibrary & UIImagePickerControllerSourceTypeSavedPhotosAlbum;
     picker.delegate = self;
-    CFStringRef mTypes[2] = { kUTTypeImage, kUTTypeMovie };
-    CFArrayRef mTypesArray = CFArrayCreate(CFAllocatorGetDefault(), (const void**)mTypes, 2, &kCFTypeArrayCallBacks);
-    picker.mediaTypes = (NSArray*)mTypesArray;
-    CFRelease(mTypesArray);
-    
     [self presentModalViewController:picker animated:YES];
     [picker release];
 }
@@ -173,72 +140,10 @@
     }
     UIImagePickerController *picker = [[UIImagePickerController alloc] init];
     picker.sourceType = UIImagePickerControllerSourceTypeCamera;
-    picker.allowsEditing = YES;
     picker.showsCameraControls = YES;
     picker.delegate = self;
     [self presentModalViewController:picker animated:YES];
     [picker release];
-}
-
-- (void)showLoggedIn {
-    self.progressView.progress = 0.0;
-    [UIView animateWithDuration:0.4 animations:^{
-        self.tableView.alpha = 1.0;
-        self.mobliConnectButton.alpha = 0.0;
-        self.leftBarButton.alpha = 1.0;
-        if ([self.dataSource count] == 0) {
-            self.progressView.alpha = 1.0;
-        }
-    }];
-}
-
-- (void)showLoggedOut:(BOOL)clearInfo {
-    
-    // Remove saved authorization information if it exists and it is
-    // ok to clear it (logout, session invalid, app unauthorized)
-    // Saving to NSUserDefaults is NOT secure and should not be used in your app.
-    // Some form of encrypted keychain is recommended.
-    
-    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-    if (clearInfo && [defaults objectForKey:@"MobliAccessTokenKey"]) {
-        [defaults removeObjectForKey:@"MobliAccessTokenKey"];
-        [defaults removeObjectForKey:@"MobliExpirationDateKey"];
-        [defaults removeObjectForKey:@"MobliUserID"];
-        [defaults synchronize];
-        
-        // Nil out the session variables to prevent
-        // the app from thinking there is a valid session
-        ConnectorAppDelegate *delegate = [ConnectorAppDelegate current];
-        if (nil != delegate.mobli.accessToken) {
-            delegate.mobli.accessToken = nil;
-        }
-        if (nil != [[delegate mobli] expirationDate]) {
-            delegate.mobli.expirationDate = nil;
-        }
-        if (nil != [[delegate mobli] userID]) {
-            delegate.mobli.userID = nil;
-        }
-    }
-    [UIView animateWithDuration:0.4 animations:^{
-        self.tableView.alpha = 0.0;
-        self.mobliConnectButton.alpha = 1.0;
-        self.leftBarButton.alpha = 0.0;
-        self.progressView.alpha = 0.0;
-    }];
-}
-
-- (void)getUserMedia {
-    NSMutableDictionary *userMediaParams = [NSMutableDictionary dictionaryWithObjectsAndKeys:
-                                            @"1",@"page",
-                                            @"24",@"max_per_page",
-                                            @"120",@"max_results",
-                                            @"1",@"noch",
-                                            @"1",@"nopl",
-                                            @"1",@"nocy",
-                                            @"1",@"noct",
-                                            @"1",@"noow",
-                                            nil];
-    [self get:@"me/media" params:userMediaParams delegate:self];
 }
 
 - (void)keyboardWillShow:(NSNotification *)notification {    
@@ -294,50 +199,27 @@
     [notificationsVC release];
 }
 
-#pragma mark - MobliSessionDelegate Methods
-
-- (void)mobliDidLogin {
-    [self showLoggedIn];
-    self.leftBarButton.alpha = 0.3;
-    self.leftBarButton.userInteractionEnabled = FALSE;
-    
-    ConnectorAppDelegate *delegate = [ConnectorAppDelegate current];
-    
-    // Save authorization information. Saving to NSUserDefaults is NOT secure and should not be used in your app.
-    // Some form of encrypted keychain is recommended.
-    
-    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-    
-    [defaults setObject:delegate.mobli.accessToken forKey:@"MobliAccessTokenKey"];
-    [defaults setObject:delegate.mobli.expirationDate forKey:@"MobliExpirationDateKey"];
-    [defaults setObject:delegate.mobli.userID forKey:@"MobliUserID"];
-    [defaults synchronize];
-    [self getUserMedia];    
-}
-
-- (void)mobliDidNotLogin:(BOOL)cancelled {
-    NSLog(@"Did not login");
-}
-
-- (void)mobliDidLogout {
-    [self showLoggedOut:YES];
-}
-
 #pragma mark - MobliRequestDelegate Methods
 
 - (void)request:(MobliRequest *)aRequest didLoad:(id)aResult {
     [UIApplication sharedApplication].networkActivityIndicatorVisible = FALSE;
     NSArray *payload = [aResult valueForKey:@"payload"];
     
-    if ([aRequest.requestName isEqualToString:@"me/media"]) {
+    if ([aRequest.requestName isEqualToString:@"me/media"]) { // This is the get 'Me' feed request
         [NSThread detachNewThreadSelector:@selector(getThumbsFromPayload:) toTarget:self withObject:payload];
     }
-    else if ([aRequest.requestName isEqualToString:@"media"]) {
+    else if ([aRequest.requestName isEqualToString:@"media"]) { // This is the upload image request
         BOOL success = [[aResult valueForKey:@"success"] boolValue];
         self.tableView.userInteractionEnabled = TRUE;
-        if (success) {
+        if (success) { // Refresh the user's 'Me' feed
             [self getUserMedia];
         }
+        UIAlertView *alert = [[[UIAlertView alloc] initWithTitle:@"Yeepy!" 
+                                                         message:@"Photo uploaded"
+                                                        delegate:nil
+                                               cancelButtonTitle:@"Cool" 
+                                               otherButtonTitles:nil] autorelease];
+        [alert show];
     }
 }
 
@@ -349,7 +231,7 @@
     // 2. the user logged out of Mobli from mobli.com or the Mobli app
     // 3. the user has changed their password
     if ([error code] == 401) {
-        [self showLoggedOut:YES];
+        [self showLoggedOut];
     }
 }
 
@@ -437,21 +319,11 @@
     // Check and retrieve authorization information. Saving to NSUserDefaults is NOT secure and should not be used in your app.
     // Some form of encrypted keychain is recommended.
     
-    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-    if ([defaults objectForKey:@"MobliAccessTokenKey"] 
-        && [defaults objectForKey:@"MobliExpirationDateKey"]
-        && [defaults objectForKey:@"MobliUserID"]) {
-        delegate.mobli.accessToken = [defaults objectForKey:@"MobliAccessTokenKey"];
-        delegate.mobli.expirationDate = [defaults objectForKey:@"MobliExpirationDateKey"];
-        delegate.mobli.userID = [defaults objectForKey:@"MobliUserID"];
-    }
-    if (![delegate.mobli isSessionValid]) {
-        [self showLoggedOut:YES];
+
+    if (![delegate.mobli isSessionValid] || ([delegate.mobli.permissions count] == 1 && [[delegate.mobli.permissions objectAtIndex:0] isEqualToString:@"shared"])) {
+        [self showLoggedOut];
     } 
     else {
-        if ([self.dataSource count] == 0) {
-            [self getUserMedia];
-        }
         [self showLoggedIn];
     }
 }
@@ -469,6 +341,50 @@
     self.textField              = nil;
     self.uploadedMediaInfo      = nil;
     [super dealloc];
+}
+
+- (void)getUserMedia {
+    NSMutableDictionary *userMediaParams = [NSMutableDictionary dictionaryWithObjectsAndKeys:
+                                            @"1",@"page",
+                                            @"24",@"max_per_page",
+                                            @"120",@"max_results",
+                                            @"1",@"noch",
+                                            @"1",@"nopl",
+                                            @"1",@"nocy",
+                                            @"1",@"noct",
+                                            @"1",@"noow",
+                                            nil];
+    [self get:@"me/media" params:userMediaParams delegate:self];
+    self.leftBarButton.alpha = 0.3;
+    self.leftBarButton.userInteractionEnabled = FALSE;
+}
+
+- (void)showLoggedIn {
+    self.progressView.progress = 0.0;
+    [UIView animateWithDuration:0.4 animations:^{
+        self.tableView.alpha = 1.0;
+        self.mobliConnectButton.alpha = 0.0;
+        self.leftBarButton.alpha = 1.0;
+        if ([self.dataSource count] == 0) {
+            self.progressView.alpha = 1.0;
+        }
+        self.rightBarButton.alpha = 1.0;
+
+    }completion:^(BOOL finished) {
+        self.rightBarButton.userInteractionEnabled = TRUE;
+    }];
+}
+
+- (void)showLoggedOut {
+    [UIView animateWithDuration:0.4 animations:^{
+        self.tableView.alpha = 0.0;
+        self.mobliConnectButton.alpha = 1.0;
+        self.leftBarButton.alpha = 0.3;
+        self.progressView.alpha = 0.0;
+        self.rightBarButton.alpha = 0.3;
+    }completion:^(BOOL finished) {
+        self.rightBarButton.userInteractionEnabled = FALSE;
+    }];
 }
 
 - (NSInteger)tableView:(UITableView *)aTableView numberOfRowsInSection:(NSInteger)aSection {
@@ -495,15 +411,9 @@
 
 - (void)imagePickerController:(UIImagePickerController *)picker didFinishPickingMediaWithInfo:(NSDictionary *)info {
     
-    NSString *type = [info objectForKey:UIImagePickerControllerMediaType];
-    if ([type isEqualToString:(NSString *)kUTTypeImage]) {
-        UIImage *img = [info valueForKey:UIImagePickerControllerOriginalImage];
-        [uploadedMediaInfo setValue:img forKey:UIImagePickerControllerOriginalImage];
-    }
-    else if ([type isEqualToString:(NSString *)kUTTypeMovie]) {
-        NSURL *mediaUrl = [info objectForKey:UIImagePickerControllerMediaURL];
-        [uploadedMediaInfo setValue:mediaUrl forKey:UIImagePickerControllerMediaURL];
-    }
+    NSString *type = [info objectForKey:UIImagePickerControllerMediaType];        
+    UIImage *img = [info valueForKey:UIImagePickerControllerOriginalImage];
+    [uploadedMediaInfo setValue:img forKey:UIImagePickerControllerOriginalImage];
     [uploadedMediaInfo setValue:type forKey:UIImagePickerControllerMediaType];
     [self.view addSubview:textField];
     [textField becomeFirstResponder];

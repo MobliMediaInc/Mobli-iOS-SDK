@@ -16,21 +16,21 @@
 
 @interface ConnectorAroundViewController (Private) <CLLocationManagerDelegate>
 
-- (void)getLocation;
+
 - (void)locationManager:(CLLocationManager *)manager didUpdateToLocation:(CLLocation *)newLocation fromLocation:(CLLocation *)oldLocation;
 - (void)getNearbyFeed:(CLLocation *)aLocation;
+
 @end
 
 
 @implementation ConnectorAroundViewController (Private)
 
-- (void)getLocation {
-    [self.locationManager startUpdatingLocation];
-}
+
 - (void)locationManager:(CLLocationManager *)manager didUpdateToLocation:(CLLocation *)newLocation fromLocation:(CLLocation *)oldLocation {
     [self.locationManager stopUpdatingLocation];
     [self getNearbyFeed:newLocation];
 }
+
 - (void)getNearbyFeed:(CLLocation *)aLocation {
 
     NSString *geo_lat = [NSString stringWithFormat:@"%f", aLocation.coordinate.latitude];
@@ -84,7 +84,6 @@
     self.locationManager.delegate = self;
     self.locationManager.desiredAccuracy = kCLLocationAccuracyBest;
     self.locationManager.distanceFilter = kCLLocationAccuracyHundredMeters;
-    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(getLocation) name:@"ACCESS_TOKEN_EXISTS" object:nil];
 
 }
 
@@ -95,5 +94,9 @@
 
 - (NSInteger)tableView:(UITableView *)aTableView numberOfRowsInSection:(NSInteger)aSection {
     return 7;
+}
+
+- (void)getLocation {
+    [self.locationManager startUpdatingLocation];
 }
 @end

@@ -39,5 +39,12 @@
 		<string>icon.png</string>
 		<string>icon@2x.png</string>
 	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array/>
+		</dict>
+	</array>
 </dict>
 </plist>

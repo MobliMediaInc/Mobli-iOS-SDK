@@ -8,6 +8,10 @@
 
 #import "ConnectorFeedViewController.h"
 
-@interface ConnectorMeViewController : ConnectorFeedViewController <MobliSessionDelegate, UIActionSheetDelegate, UIImagePickerControllerDelegate, UINavigationControllerDelegate>
+@interface ConnectorMeViewController : ConnectorFeedViewController <UIActionSheetDelegate, UIImagePickerControllerDelegate, UINavigationControllerDelegate>
 
+// Method for initiating an API request for the user's last 24 medias
+- (void)getUserMedia; 
+- (void)showLoggedIn;
+- (void)showLoggedOut;
 @end

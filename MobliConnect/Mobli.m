@@ -1,43 +1,94 @@
-/*
- * Copyright 2011 Mobli
+
+
+/* Copyright 2012 Mobli Media inc.
+ *
+ *  The following code is derived from Facebook iOS sdk.
+ *  Modifications were made to all original methods by Ariel Krieger, Mobli, 05/16/2012
+ *
+ 
+ 
+ ********** Original Facebook License *************************************
+ 
+ * Copyright 2010 Facebook
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
  *    http://www.apache.org/licenses/LICENSE-2.0
-
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */
+ 
+ ********** Original Facebook License *************************************/
+
+
 
 #import "Mobli.h"
-#import "MobliRequest.h"
 #import <ImageIO/ImageIO.h>
 
 
-static NSString *requestFinishedKeyPath = @"state";
-static void *finishedContext = @"finishedContext";
+#define kMobliResponseTypeToken                 @"token"
+#define kMobliResponseTypeCode                  @"code"
+#define kMobliWebAuthURLScheme                  @"mobli"
+#define kMobliAppAuthEndpoint                   @"authorize"
+#define kMobliAppSharedEndpoint                 @"shared"
+#define kMobliPublicCredentials                 @"client_credentials"
+
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 @interface Mobli ()
 
 // private properties
-@property(nonatomic, retain) NSArray* permissions;
-@property(nonatomic, copy) NSString* appId;
+
+@property(nonatomic, copy) NSString             *clientId;
+@property(nonatomic, copy) NSString             *clientSecret;
+@property(nonatomic, retain) NSMutableSet       *requests;
 
 @end
 
 // private methods
+
 @interface Mobli (Private)
 
+/**
+ * Starts a dialog which prompts the user to log in to Mobli and grant
+ * the requested permissions to the application.
+ *
+ * Also note that requests may be made to the API without calling
+ * authorize() first, in which case only public information is returned.
+ *
+ */
+- (void)authorizeWithMobliAppAuth;
+
+/**
+ * Make a request to Mobli's REST API with the given resource path and parameters.
+ *
+ * @param resourcePath: A valid REST server API endpoint
+ * @param params: Key-value pairs of parameters to the request
+ * @param httpMethod: http method @"GET" or @"POST" 
+ * @param delegate: Callback interface for notifying the calling application when the request has received response
+ * @return MobliRequest: Returns a pointer to the MobliRequest object.
+ */
 - (MobliRequest*)requestWithResourcePath:(NSString *)resourcePath
                                andParams:(NSMutableDictionary *)params
                            andHttpMethod:(NSString *)httpMethod
                              andDelegate:(id <MobliRequestDelegate>)delegate;
+
+
+/**
+ * A private helper method for sending HTTP requests.
+ *
+ * @param url: url to send http request
+ * @param params: parameters to append to the url
+ * @param httpMethod: http method @"GET" or @"POST"
+ * @param delegate: Callback interface for notifying the calling application when the request has received response
+ * @param aRequestName: A convenience paramter, naming the request
+ */
 
 - (MobliRequest*)openUrl:(NSString *)url
                   params:(NSMutableDictionary *)params
@@ -45,73 +96,174 @@ static void *finishedContext = @"finishedContext";
                 delegate:(id<MobliRequestDelegate>)delegate 
                  andName:(NSString *)aRequestName;
 
+
+/**
+ * Set the access token, refresh token,expiration date, and user ID after successful login
+ */
 - (void)mobliDialogLogin:(NSString*)aAccesstoken refreshToken:(NSString *)aRefreshToken userID:(NSString *)aUserID expirationDate:(NSDate*)anExpirationDate;
 
+
+/**
+ * Did not login call the not login delegate
+ */
 - (void)mobliDialogNotLogin:(BOOL)cancelled;
 
+
+/**
+ * Check the payload after oauth request ends
+ */
+- (void)checkOAuthResponseParams:(NSDictionary *)params;
+
+
+/**
+ * Helper method that corrects any orientation issues with images
+ */
 - (UIImage *)prepareImageForUpload:(UIImage *)anImage;
 
+
+/**
+ * A private method for getting the app's base url.
+ */
+- (NSString *)getOwnBaseUrl;
+
+
+/**
+ * A private method for parsing URL parameters.
+ */
+- (NSDictionary*)parseURLParams:(NSString *)query;
 
 @end
 
 @implementation Mobli (Private)
 
-/**
- * Make a request to Mobli's REST API with the given resource path and
- * parameters.
- *
- * See 
- *
- *
- * @param methodName
- *             a valid REST server API method.
- * @param parameters
- *            Key-value pairs of parameters to the request. Refer to the
- *            documentation: one of the parameters must be "method". 
- * @param delegate
- *            Callback interface for notifying the calling application when
- *            the request has received response
- * @param aRequestName
- *            A convenience paramter, naming the request
- *
- * @return MobliRequest *
- *            Returns a pointer to the FBRequest object.
- */
+- (void)authorizeWithMobliAppAuth {
+    
+    // Set up the parameters for the request:
+    // Response_type can be "code" (explicit) instead of "token" (implicit). In this example we're using the implicit flow
+    NSMutableDictionary* params = [NSMutableDictionary dictionaryWithObjectsAndKeys:
+                                   self.clientId, @"client_id",
+                                   kMobliResponseTypeToken, @"response_type",
+                                   nil];
+    
+    // Set the URL for the dialog
+    NSString *loginDialogURL = [kMobliDialogBaseURL stringByAppendingString:kMobliAppAuthEndpoint];
+    
+    // Rearrange permissions into correct format (e.g. scope='shared basic advanced')
+    if (self.permissions != nil) {
+        NSString* scope = [self.permissions componentsJoinedByString:@" "];
+        [params setValue:scope forKey:@"scope"];
+    }
+    
+    // If you do not specify a redirect_uri here, you will be redirected to the URI you set when registering your app
+    NSString *nextUrl = [self getOwnBaseUrl];
+    [params setValue:nextUrl forKey:@"redirect_uri"];
+    
+    // Serialize the dialog URL along with the parameters and open it using Safari
+    NSString *mobliAppUrl = [MobliRequest serializeURL:loginDialogURL params:params];
+    [[UIApplication sharedApplication] openURL:[NSURL URLWithString:mobliAppUrl]];
+}
 
 - (MobliRequest *)requestWithResourcePath:(NSString *)resourcePath 
                                 andParams:(NSMutableDictionary *)params 
                             andHttpMethod:(NSString *)httpMethod 
                               andDelegate:(id<MobliRequestDelegate>)delegate {
     NSString *fullURL = [kMobliRestserverBaseURL stringByAppendingFormat:resourcePath];
-
+    
     return [self openUrl:fullURL
                   params:params 
               httpMethod:httpMethod
                 delegate:delegate
-                 andName:resourcePath];
+                 andName:resourcePath]; //by default, we name the request the same as the endpoint (resourcePath)
 }
 
-/**
- * Set the access token, refresh token,expiration date, and user ID after login succeed
- */
+- (MobliRequest*)openUrl:(NSString *)url
+                  params:(NSMutableDictionary *)params
+              httpMethod:(NSString *)httpMethod
+                delegate:(id<MobliRequestDelegate>)delegate 
+                 andName:(NSString *)aRequestName {
+    
+    // If no parameters were set in the initial request, params will be nil
+    if (!params) {
+        params = [NSMutableDictionary dictionary];
+    }
+    
+    // We add the access token to the request's url query
+    if ([self isSessionValid]) {
+        [params setValue:self.accessToken forKey:@"access_token"];
+    }
+    
+    // For DELETE requests we add the http method name in the request params and change the request's http method to POST
+    if ([httpMethod isEqualToString:@"DELETE"]) {
+        [params setObject:@"DELETE" forKey:@"http_method"];
+        httpMethod = @"POST";
+    }
+    
+    // Initialize the request and get going
+    MobliRequest *request = [[MobliRequest getRequestWithParams:params
+                                                     httpMethod:httpMethod
+                                                       delegate:delegate
+                                                     requestURL:url
+                                                           name:aRequestName] retain];
+    [self.requests addObject:request];
+    [request connect];
+    return request;
+}
 
-- (void)mobliDialogLogin:(NSString *)aAccesstoken refreshToken:(NSString *)aRefreshToken userID:(NSString *)aUserID expirationDate:(NSDate *)anExpirationDate {
+- (void)mobliDialogLogin:(NSString *)aAccesstoken 
+            refreshToken:(NSString *)aRefreshToken 
+                  userID:(NSString *)aUserID 
+          expirationDate:(NSDate *)anExpirationDate {
+    
+    // Set the relevant data
     self.accessToken = aAccesstoken;
     self.refreshToken = aRefreshToken;
     self.expirationDate = anExpirationDate;
     self.userID = aUserID;
+    
+    // Inform the session delegate login was successful
     if ([self.sessionDelegate respondsToSelector:@selector(mobliDidLogin)]) {
-        [_sessionDelegate mobliDidLogin];
+        [self.sessionDelegate mobliDidLogin];
     }
 }
 
-/**
- * Did not login call the not login delegate
- */
 - (void)mobliDialogNotLogin:(BOOL)cancelled {
+    // Inform the session delegate login was unsuccessful, cancelled == TRUE means the login was canceled by the user
     if ([self.sessionDelegate respondsToSelector:@selector(mobliDidNotLogin:)]) {
-        [_sessionDelegate mobliDidNotLogin:cancelled];
+        [self.sessionDelegate mobliDidNotLogin:cancelled];
     }
+}
+
+- (void)checkOAuthResponseParams:(NSDictionary *)params {
+    NSString *anAccessToken = [params valueForKey:@"access_token"];
+    NSString *aRefreshToken = [params valueForKey:@"refresh_token"];
+    NSString *expTime = [params valueForKey:@"expires_in"];
+    NSString *user_ID = [params valueForKey:@"user_id"];
+    
+    // If the URL doesn't contain the access token, an error has occurred.
+    if (!anAccessToken) {
+        NSString *errorReason = [params valueForKey:@"error"];
+        
+        BOOL userCanceled = [errorReason isEqualToString:@"authorization_request_canceled"];
+        [self mobliDialogNotLogin:userCanceled];
+        
+        //        NSString *errorDescription = [params valueForKey:@"error_description"];
+        //        NSString *errorUri = [params valueForKey:@"error_uri"];
+        
+        
+        return;
+    }
+    
+    // We have an access token, so parse the expiration date.
+    NSDate *anExpirationDate = [NSDate distantFuture];
+    if (expTime != nil) {
+        int expVal = [expTime intValue];
+        if (expVal != 0) {
+            anExpirationDate = [NSDate dateWithTimeIntervalSinceNow:expVal];
+        }
+    }
+    
+    
+    [self mobliDialogLogin:anAccessToken refreshToken:aRefreshToken userID:user_ID expirationDate:anExpirationDate];
 }
 
 - (UIImage *)prepareImageForUpload:(UIImage *)anImage {
@@ -189,42 +341,23 @@ static void *finishedContext = @"finishedContext";
     return img;    
 }
 
-/**
- * A private helper function for sending HTTP requests.
- *
- * @param url
- *            url to send http request
- * @param params
- *            parameters to append to the url
- * @param httpMethod
- *            http method @"GET" or @"POST"
- * @param delegate
- *            Callback interface for notifying the calling application when
- *            the request has received response
- * @param aRequestName
- *            A convenience paramter, naming the request
- */
+- (NSString *)getOwnBaseUrl {
+    return [NSString stringWithFormat:@"%@%@://%@",kMobliWebAuthURLScheme, 
+            self.clientId,kMobliAppAuthEndpoint];
+}
 
-- (MobliRequest*)openUrl:(NSString *)url
-                  params:(NSMutableDictionary *)params
-              httpMethod:(NSString *)httpMethod
-                delegate:(id<MobliRequestDelegate>)delegate 
-                 andName:(NSString *)aRequestName {
-    
-    // We add the access token to the request's url query only for GET requests
-    if ([self isSessionValid] && [httpMethod isEqualToString:@"GET"]) {
-        [params setValue:self.accessToken forKey:@"access_token"];
-    }
-    
-    MobliRequest *_request = [[MobliRequest getRequestWithParams:params
-                                                      httpMethod:httpMethod
-                                                        delegate:delegate
-                                                      requestURL:url
-                                                            name:aRequestName] retain];
-    [_requests addObject:_request];
-    [_request addObserver:self forKeyPath:requestFinishedKeyPath options:0 context:finishedContext];
-    [_request connect];
-    return _request;
+- (NSDictionary*)parseURLParams:(NSString *)query {
+	NSArray *pairs = [query componentsSeparatedByString:@"&"];
+	NSMutableDictionary *params = [[[NSMutableDictionary alloc] init] autorelease];
+	for (NSString *pair in pairs) {
+		NSArray *kv = [pair componentsSeparatedByString:@"="];
+		NSString *val =
+        [[kv objectAtIndex:1]
+         stringByReplacingPercentEscapesUsingEncoding:NSUTF8StringEncoding];
+        
+		[params setObject:val forKey:[kv objectAtIndex:0]];
+	}
+    return params;
 }
 
 @end
@@ -233,358 +366,129 @@ static void *finishedContext = @"finishedContext";
 
 @implementation Mobli
 
-@synthesize accessToken =                       _accessToken,
-           refreshToken =                       _refreshToken,
-         expirationDate =                       _expirationDate,
-                 userID =                       _userID,
-        sessionDelegate =                       _sessionDelegate,
-            permissions =                       _permissions,
-        urlSchemeSuffix =                       _urlSchemeSuffix,
-                  appId =                       _appId;
+@synthesize accessToken;
+@synthesize refreshToken;
+@synthesize expirationDate;
+@synthesize userID;
+@synthesize sessionDelegate;
+@synthesize permissions;
+@synthesize clientId;
+@synthesize clientSecret;
+@synthesize requests;
 
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-
-
-- (id)initWithAppId:(NSString *)appId
-        andDelegate:(id<MobliSessionDelegate>)delegate {
-  self = [self initWithAppId:appId urlSchemeSuffix:nil andDelegate:delegate];
-  return self;
-}
-
-/**
- * Initialize the Mobli object with application ID.
- *
- * @param appId the mobli app id
- * @param urlSchemeSuffix
- *   urlSchemeSuffix is a string of lowercase letters that is
- *   appended to the base URL scheme used for SSO. For example,
- *   if your Mobli ID is "350685531728" and you set urlSchemeSuffix to
- *   "abcd", the Mobli app will expect your application to bind to
- *   the following URL scheme: "mobli350685531728abcd".
- *   This is useful if your have multiple iOS applications that
- *   share a single Mobli application id (for example, if you
- *   have a free and a paid version on the same app) and you want
- *   to use SSO with both apps. Giving both apps different
- *   urlSchemeSuffix values will allow the Mobli app to disambiguate
- *   their URL schemes and always redirect the user back to the
- *   correct app, even if both the free and the app is installed
- *   on the device.
- *   urlSchemeSuffix is currently not supported on the Mobli
- *   app. If the user has an older version of the Mobli app
- *   installed and your app uses urlSchemeSuffix parameter, the SDK will
- *   proceed as if the Mobli app isn't installed on the device
- *   and redirect the user to Safari.
- *
- * @param delegate the MobliSessionDelegate
- */
-- (id)initWithAppId:(NSString *)appId
-    urlSchemeSuffix:(NSString *)urlSchemeSuffix
-        andDelegate:(id<MobliSessionDelegate>)delegate {
-  
-  self = [super init];
-  if (self) {
-    _requests = [[NSMutableSet alloc] init];
-    self.appId = appId;
-    self.sessionDelegate = delegate;
-    self.urlSchemeSuffix = urlSchemeSuffix;
-  }
-  return self;
-}
-
-/**
- * Override NSObject : free the space
- */
 - (void)dealloc {
-    for (MobliRequest *_request in _requests) {
-        [_request removeObserver:self forKeyPath:requestFinishedKeyPath];
-    }
-    [_accessToken release];
-    [_expirationDate release];
-    [_userID release];
-    [_requests release];
-    [_appId release];
-    [_permissions release];
-    [_urlSchemeSuffix release];
-    [super dealloc];
-}
-
-- (void)invalidateSession {
     self.accessToken = nil;
     self.refreshToken = nil;
     self.expirationDate = nil;
+    self.userID = nil;
+    self.sessionDelegate = nil;
+    self.permissions = nil;
+    self.clientId = nil;
+    self.clientSecret = nil;
+    self.requests = nil;
+    [super dealloc];
 }
-
-
-- (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context {
-    if (context == finishedContext) {
-        MobliRequest *_request = (MobliRequest *)object;
-        MobliRequestState requestState = [_request state];
-        if (requestState == kMobliRequestStateComplete) {
-            if ([_request sessionDidExpire]) {
-                [self invalidateSession];
-                if ([self.sessionDelegate respondsToSelector:@selector(mobliSessionInvalidated)]) {
-                    [self.sessionDelegate mobliSessionInvalidated];
-                }
-            }
-            [_request removeObserver:self forKeyPath:requestFinishedKeyPath];
-            [_requests removeObject:_request];
-        }
-    }
-}
-
-/**
- * A private function for getting the app's base url.
- */
-- (NSString *)getOwnBaseUrl {
-  return [NSString stringWithFormat:@"%@%@://%@",kMobliWebAuthURLScheme, 
-          _appId,kMobliAppAuthURLPath];
-}
-
-/**
- * A private function for opening the authorization dialog.
- */
-- (void)authorizeWithMobliAppAuth:(BOOL)tryMobliAppAuth
-                    safariAuth:(BOOL)trySafariAuth {
-    
-// response_type can be "code" (explicit) instead of "token" (implicit)
-  NSMutableDictionary* params = [NSMutableDictionary dictionaryWithObjectsAndKeys:
-                                                         _appId, @"client_id",
-                                        kMobliResponseTypeToken, @"response_type",
-                                                                 nil];
-
-  NSString *loginDialogURL = [kMobliDialogBaseURL stringByAppendingString:kMobliAppAuthURLPath];
-
-  if (_permissions != nil) {
-    NSString* scope = [_permissions componentsJoinedByString:@" "];
-    [params setValue:scope forKey:@"scope"];
-  }
-
-  if (_urlSchemeSuffix) {
-    [params setValue:_urlSchemeSuffix forKey:@"local_client_id"];
-  }
-  
-  // If the device is running a version of iOS that supports multitasking,
-  // try to obtain the access token from the Facebook app installed
-  // on the device.
-  // If the Mobli app isn't installed or it doesn't support
-  // the moblioauth:// URL scheme, fall back on Safari for obtaining the access token.
-  // This minimizes the chance that the user will have to enter his or
-  // her credentials in order to authorize the application.
-    
-  BOOL didOpenOtherApp = NO;
-  UIDevice *device = [UIDevice currentDevice];
-  if ([device respondsToSelector:@selector(isMultitaskingSupported)] && [device isMultitaskingSupported]) {
-    if (tryMobliAppAuth) {
-      NSString *scheme = kMobliAppAuthURLScheme;
-      if (_urlSchemeSuffix) {
-        scheme = [scheme stringByAppendingString:@"2"];
-      }
-        NSString *urlPrefix = [NSString stringWithFormat:@"%@://%@", scheme, kMobliAppAuthURLPath];
-        NSString *mobliAppUrl = [MobliRequest serializeURL:urlPrefix params:params];
-        didOpenOtherApp = [[UIApplication sharedApplication] openURL:[NSURL URLWithString:mobliAppUrl]];
-    }
-
-    if (trySafariAuth && !didOpenOtherApp) {
-        NSString *nextUrl = [self getOwnBaseUrl];
-        [params setValue:nextUrl forKey:@"redirect_uri"];
-        NSString *mobliAppUrl = [MobliRequest serializeURL:loginDialogURL params:params];
-        didOpenOtherApp = [[UIApplication sharedApplication] openURL:[NSURL URLWithString:mobliAppUrl]];
-        }
-    }
-}
-
-/**
- * A function for parsing URL parameters.
- */
-- (NSDictionary*)parseURLParams:(NSString *)query {
-	NSArray *pairs = [query componentsSeparatedByString:@"&"];
-	NSMutableDictionary *params = [[[NSMutableDictionary alloc] init] autorelease];
-	for (NSString *pair in pairs) {
-		NSArray *kv = [pair componentsSeparatedByString:@"="];
-		NSString *val =
-    [[kv objectAtIndex:1]
-     stringByReplacingPercentEscapesUsingEncoding:NSUTF8StringEncoding];
-
-		[params setObject:val forKey:[kv objectAtIndex:0]];
-	}
-  return params;
-}
-
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //public
+///////////////////////////////////////////////////////////////////////////////////////////////////
 
-/**
- * Starts a dialog which prompts the user to log in to Mobli and grant
- * the requested permissions to the application.
- *
- * If the device supports multitasking, we use fast app switching to show
- * the dialog in the Mobli app or, if the Mobli app isn't installed,
- * in Safari (this enables single sign-on by allowing multiple apps on
- * the device to share the same user session).
- * When the user grants or denies the permissions, the app that
- * showed the dialog (the Mobli app or Safari) redirects back to
- * the calling application, passing in the URL the access token
- * and/or any other parameters the Mobli backend includes in
- * the result (such as an error code if an error occurs).
- *
- * See (link unavailable) for more details.
- *
- * Also note that requests may be made to the API without calling
- * authorize() first, in which case only public information is returned.
- *
- * @param permissions
- *            A list of permission required for this application: e.g.
- *            "shared", "login", or "advanced". see (link unavailable) 
- *            This parameter should not be null -- if you do not require any
- *            permissions, then pass in an empty String array.
- * @param delegate
- *            Callback interface for notifying the calling application when
- *            the user has logged in.
- */
-- (void)login:(NSArray *)permissions {
-  self.permissions = permissions;
-
-// You can choose not to use app auth or safari auth by setting the below arguments accordingly
-  [self authorizeWithMobliAppAuth:YES safariAuth:YES];
+- (id)initWithClientId:(NSString *)aClientId
+          clientSecret:(NSString *)aClientSecret
+           andDelegate:(id<MobliSessionDelegate>)delegate {
+    self = [super init];
+    if (self) {
+        self.requests = [[[NSMutableSet alloc] init] autorelease];
+        self.clientId = aClientId;
+        self.clientSecret = aClientSecret;
+        self.sessionDelegate = delegate;
+    }
+    return self;
 }
 
-- (void)loginWithPermissions:(NSArray *)permissions asGuest:(BOOL)guest withDelegate:(id<MobliRequestDelegate>)delegate {
-    self.permissions = permissions;
-    if (guest) {
-        NSMutableDictionary *params = [NSMutableDictionary dictionaryWithObjectsAndKeys:kMobliPublicCredentials,@"grant_type",
-                                                                                                    kMobliAppId,@"client_id",
-                                                                                                kMobliAppSecret,@"client_secret",
-                                                                                                                nil];
+- (void)loginAsGuest {
+    [self loginWithPermissions:[NSArray arrayWithObject:@"shared"] asGuest:YES];
+}
+
+- (void)loginWithPermissions:(NSArray *)aPermissions {
+    [self loginWithPermissions:aPermissions asGuest:NO];
+}
+
+- (void)loginWithPermissions:(NSArray *)aPermissions asGuest:(BOOL)asGuest {
+    self.permissions = aPermissions;
+    // If asGuest == TRUE, we initiate a public token request
+    if (asGuest) {
+        NSMutableDictionary *params = [NSMutableDictionary dictionaryWithObjectsAndKeys:
+                                       kMobliPublicCredentials  ,@"grant_type",
+                                       self.clientId            ,@"client_id",
+                                       self.clientSecret        ,@"client_secret",
+                                       nil];
         
-        // Setting request URL
+        if (permissions) {
+            NSString* scope = [permissions componentsJoinedByString:@" "];
+            [params setValue:scope forKey:@"scope"];
+        }
+        
         NSString *requestURL = [NSString stringWithFormat:@"%@%@",kMobliDialogBaseURL,kMobliAppSharedEndpoint];
-                
-        // Initializing the MobliRequest with the parameters (params), URL (requestURL), "POST" http method and MobliRequestDelegate
+        
+        // Initializing the MobliRequest with the parameters (params), 
+        //                                        http method ("POST"), 
+        //                                        MobliRequestDelegate (self), 
+        //                                        URL (requestURL), 
+        //                                        and name ("getPublicToken") 
         MobliRequest *request = [MobliRequest getRequestWithParams:params 
                                                         httpMethod:@"POST" 
-                                                          delegate:delegate 
+                                                          delegate:self 
                                                         requestURL:requestURL 
                                                               name:@"getPublicToken"];
         
         [request connect];
-        
-        
     }
     else {
-        [self authorizeWithMobliAppAuth:YES safariAuth:YES];
+        
+        // If asGuest == FALSE, we go to private authorization
+        [self authorizeWithMobliAppAuth];
     }
 }
 
-/**
- * This function processes the URL the Mobli application or Safari used to
- * open your application during a single sign-on flow.
- *
- * You MUST call this function in your UIApplicationDelegate's handleOpenURL
- * method (see
- * http://developer.apple.com/library/ios/#documentation/uikit/reference/UIApplicationDelegate_Protocol/Reference/Reference.html
- * for more info).
- *
- * This will ensure that the authorization process will proceed smoothly once the
- * Mobli application or Safari redirects back to your application.
- *
- * @param URL the URL that was passed to the application delegate's handleOpenURL method.
- *
- * @return YES if the URL starts with 'mobli[app_id]://authorize and hence was handled
- *   by SDK, NO otherwise.
- *
- * You will need to add the redirect uri scheme of your application to the URL types in the plist file.
- * See http://developer.apple.com/library/ios/#documentation/iphone/conceptual/iphoneosprogrammingguide/AdvancedAppTricks/AdvancedAppTricks.html (Under 'Registering Custom URL Schemes')
- */
-
+- (void)logout:(id<MobliSessionDelegate>)delegate {
+    
+    self.sessionDelegate = delegate;
+    self.accessToken = nil;
+    self.refreshToken = nil;
+    self.expirationDate = nil;
+    self.userID = nil;
+    
+    if ([self.sessionDelegate respondsToSelector:@selector(mobliDidLogout)]) {
+        [sessionDelegate mobliDidLogout];
+    }
+}
 
 - (BOOL)handleOpenURL:(NSURL *)url {
+    
+    NSLog(@"handleOpenURL %@",url);
     // If the URL's structure doesn't match the structure used for Mobli authorization, abort.
     if (![[url absoluteString] hasPrefix: [self getOwnBaseUrl]]) {
-    return NO;
+        return NO;
     }
-
     NSString *query = [url query];
     NSDictionary *params = [self parseURLParams:query];
-    NSString *accessToken = [params valueForKey:@"access_token"];
-    NSString *refreshToken = [params valueForKey:@"refresh_token"];
-    NSString *expTime = [params valueForKey:@"expires_in"];
-    NSString *user_ID = [params valueForKey:@"user_id"];
     
-    // If the URL doesn't contain the access token, an error has occurred.
-    if (!accessToken) {
-        NSString *errorReason = [params valueForKey:@"error"];
-        
-        // If the error response indicates that we should try again using Safari, open
-        // the authorization dialog in Safari.
-        if (errorReason && [errorReason isEqualToString:@"service_disabled_use_browser"]) {
-            [self authorizeWithMobliAppAuth:NO safariAuth:YES];
-            return YES;
-        }
-        // The mobli app may return an error_code parameter in case it
-        // encounters a UIWebViewDelegate error. This should not be treated
-        // as a cancel.
-        NSString *errorCode = [params valueForKey:@"error_code"];
-        
-        BOOL userDidCancel = !errorCode && (!errorReason || [errorReason isEqualToString:@"access_denied"]);
-        [self mobliDialogNotLogin:userDidCancel];
-        return YES;
-    }
-    
-    // We have an access token, so parse the expiration date.
-    NSDate *expirationDate = [NSDate distantFuture];
-    if (expTime != nil) {
-        int expVal = [expTime intValue];
-        if (expVal != 0) {
-            expirationDate = [NSDate dateWithTimeIntervalSinceNow:expVal];
-        }
-    }
-    
-    [self mobliDialogLogin:accessToken refreshToken:refreshToken userID:user_ID expirationDate:expirationDate];
+    NSLog(@"handleOpenURL %@",params);
+    [self checkOAuthResponseParams:params];
     return YES;
 }
 
-/**
- * Invalidate the current user session by removing the access token in
- * memory and clearing the browser cookie.
- *
- * Note that this method dosen't unauthorize the application --
- * it just removes the access token. To unauthorize the application,
- * the user must remove the app in the app settings page under the privacy
- * settings screen on facebook.com.
- *
- * @param delegate
- *            Callback interface for notifying the calling application when
- *            the application has logged out
- */
-- (void)logout:(id<MobliSessionDelegate>)delegate {
-
-    self.sessionDelegate = delegate;
-    [_accessToken release];
-    _accessToken = nil;
-    [_refreshToken release];
-    _refreshToken = nil;
-    [_expirationDate release];
-    _expirationDate = nil;
-    [_userID release];
-    _userID = nil;
-
-    if ([self.sessionDelegate respondsToSelector:@selector(mobliDidLogout)]) {
-    [_sessionDelegate mobliDidLogout];
-    }
-}
-
-
-/**
- * @return boolean - whether this object has an non-expired session token
- */
 - (BOOL)isSessionValid {
-  return (self.accessToken      != nil &&
-          self.expirationDate   != nil && 
-          NSOrderedDescending   == [self.expirationDate compare:[NSDate date]]);
-
+    return (self.accessToken      != nil &&
+            self.expirationDate   != nil && 
+            NSOrderedDescending   == [self.expirationDate compare:[NSDate date]]);
 }
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////
+// API Requests
+///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 - (MobliRequest *)get:(NSString *)resourcePath 
                params:(NSMutableDictionary *)params 
@@ -601,48 +505,48 @@ static void *finishedContext = @"finishedContext";
 - (MobliRequest *)postImage:(UIImage *)image 
                      params:(NSMutableDictionary *)params 
                    delegate:(id<MobliRequestDelegate>)delegate {
-
+    
     // Fix image orientation if needed
     UIImage *imgForUpload   = [self prepareImageForUpload:image];
-    NSString *imgWidth      = [NSString stringWithFormat:@"%.0f",imgForUpload.size.width];
-    NSString *imgHeight     = [NSString stringWithFormat:@"%.0f",imgForUpload.size.height];
+    
+    if (!params) {
+        params = [NSMutableDictionary dictionary];
+    }
     
     [params setValue:imgForUpload   forKey:@"file"];
     [params setValue:@"photo"       forKey:@"type"];
-    [params setValue:imgWidth       forKey:@"width"];
-    [params setValue:imgHeight      forKey:@"height"];
     
     return [self requestWithResourcePath:@"media" 
                                andParams:params 
                            andHttpMethod:@"POST" 
                              andDelegate:delegate];
-    
 }
 
 - (MobliRequest *)delete:(NSString *)resourcePath 
                 delegate:(id<MobliRequestDelegate>)delegate {
     return [self requestWithResourcePath:resourcePath andParams:nil andHttpMethod:@"DELETE" andDelegate:delegate];
-    
 }
 
 
-///////////////////////////////////////////////////////////////////////////////////////////////////
-
+///////////////////////////////////////////////////////////////////////////////////////////////////////////
 // MobliRequestDelegate
+// These delegate methods are only called for requests to get a public access token
 
-/**
- * Handle the auth.ExpireSession api call failure
- */
-- (void)request:(MobliRequest*)request didFailWithError:(NSError*)error{
-    NSString *alertTitle = [NSString stringWithFormat: @"Error code %i",[error code]];
-    NSString *alertMessage = [NSString stringWithFormat:@"%@",[error userInfo]];
-    UIAlertView *errorAlert = [[UIAlertView alloc] initWithTitle:alertTitle
-                                                         message:alertMessage 
-                                                        delegate:nil 
-                                               cancelButtonTitle:@"OK" 
-                                               otherButtonTitles:nil];
-    [errorAlert show];
-    [errorAlert release];
+- (void)request:(MobliRequest *)request didFailWithError:(NSError *)error {
+    if ([request.requestName isEqualToString:@"getPublicToken"]) {
+        if ([sessionDelegate respondsToSelector:@selector(mobliDidNotLogin:)]) {
+            [sessionDelegate mobliDidNotLogin:NO];
+        }
+    }
 }
+
+- (void)request:(MobliRequest *)request didLoad:(id)result {
+    if ([request.requestName isEqualToString:@"getPublicToken"]) {
+        if ([sessionDelegate respondsToSelector:@selector(mobliDidLogin)]) {
+            [self checkOAuthResponseParams:result];
+        }
+    }
+}
+
 
 @end

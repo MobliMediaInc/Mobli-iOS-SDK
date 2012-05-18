@@ -10,4 +10,6 @@
 
 @interface ConnectorLiveViewController : ConnectorFeedViewController
 
+- (void)getLiveFeed;
+
 @end

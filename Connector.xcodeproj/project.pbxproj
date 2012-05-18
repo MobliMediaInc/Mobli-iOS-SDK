@@ -110,7 +110,6 @@
 		B08DC4A2155A48C200E7AE81 /* Mobli.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Mobli.h; sourceTree = "<group>"; };
 		B08DC4A3155A48C200E7AE81 /* Mobli.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = Mobli.m; sourceTree = "<group>"; };
 		B08DC4A4155A48C200E7AE81 /* MobliConnect.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MobliConnect.h; sourceTree = "<group>"; };
-		B08DC4A5155A48C200E7AE81 /* MobliConstants.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MobliConstants.h; sourceTree = "<group>"; };
 		B08DC4A6155A48C200E7AE81 /* MobliRequest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MobliRequest.h; sourceTree = "<group>"; };
 		B08DC4A7155A48C200E7AE81 /* MobliRequest.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = MobliRequest.m; sourceTree = "<group>"; };
 		B08DC4B0155A492700E7AE81 /* ConnectorFeedViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ConnectorFeedViewController.h; sourceTree = "<group>"; };
@@ -267,7 +266,6 @@
 				B08DC4A2155A48C200E7AE81 /* Mobli.h */,
 				B08DC4A3155A48C200E7AE81 /* Mobli.m */,
 				B08DC4A4155A48C200E7AE81 /* MobliConnect.h */,
-				B08DC4A5155A48C200E7AE81 /* MobliConstants.h */,
 				B08DC4A6155A48C200E7AE81 /* MobliRequest.h */,
 				B08DC4A7155A48C200E7AE81 /* MobliRequest.m */,
 			);

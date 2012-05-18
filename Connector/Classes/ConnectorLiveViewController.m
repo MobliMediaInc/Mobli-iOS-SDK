@@ -8,33 +8,6 @@
 
 #import "ConnectorLiveViewController.h"
 
-@interface ConnectorLiveViewController ()
-
-@end
-
-@interface ConnectorLiveViewController (Private)
-
-- (void)getLiveFeed;
-
-@end
-
-@implementation ConnectorLiveViewController (Private)
-
-- (void)getLiveFeed {
-    NSMutableDictionary *liveMediaParams = [NSMutableDictionary dictionaryWithObjectsAndKeys:
-                                            @"1",@"page",
-                                            @"21",@"max_per_page",
-                                            @"21",@"max_results",
-                                            @"1",@"noch",
-                                            @"1",@"nopl",
-                                            @"1",@"nocy",
-                                            @"1",@"noct",
-                                            nil];
-    
-    [self get:@"live" params:liveMediaParams delegate:self];
-}
-
-@end
 
 @implementation ConnectorLiveViewController
 
@@ -62,7 +35,6 @@
     self.leftBarButton.titleLabel.font = refreshFont;
     self.leftBarButton.titleLabel.textAlignment = UITextAlignmentCenter;
     [self.navBar addSubview:self.leftBarButton];
-    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(getLiveFeed) name:@"ACCESS_TOKEN_EXISTS" object:nil];
 
 }
 
@@ -74,6 +46,20 @@
 
 - (NSInteger)tableView:(UITableView *)aTableView numberOfRowsInSection:(NSInteger)aSection {
     return 7;
+}
+
+- (void)getLiveFeed {
+    NSMutableDictionary *liveMediaParams = [NSMutableDictionary dictionaryWithObjectsAndKeys:
+                                            @"1",@"page",
+                                            @"21",@"max_per_page",
+                                            @"21",@"max_results",
+                                            @"1",@"noch",
+                                            @"1",@"nopl",
+                                            @"1",@"nocy",
+                                            @"1",@"noct",
+                                            nil];
+    
+    [self get:@"explore/live" params:liveMediaParams delegate:self];
 }
 
 

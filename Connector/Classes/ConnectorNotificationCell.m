@@ -8,6 +8,8 @@
 
 #import "ConnectorNotificationCell.h"
 
+#define kMobliCDNBaseURL                         @"http://stat.mobli.com/"
+
 @interface ConnectorNotificationCell ()
 
 @property(nonatomic, retain) UIImageView    *notificationImageView;
@@ -26,7 +28,7 @@
 - (void)postSetSubject {
     NSString *mediaId = [(NSDictionary *)subject valueForKey:@"entity_id"];
     NSString *msgText = [(NSDictionary *)subject valueForKey:@"value"];
-    NSString *thumbPath = [NSString stringWithFormat:@"%@thumbs/thumb_%@_200.jpg",kMobliCDNDomain,mediaId];
+    NSString *thumbPath = [NSString stringWithFormat:@"%@thumbs/thumb_%@_200.jpg",kMobliCDNBaseURL,mediaId];
 
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         UIImage *image = [UIImage imageWithData:[NSData dataWithContentsOfURL:[NSURL URLWithString:thumbPath]]];

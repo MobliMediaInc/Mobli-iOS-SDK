@@ -9,6 +9,8 @@
 #import "ConnectorFeedViewController.h"
 #import "ConnectorAppDelegate.h"
 
+#define kMobliCDNBaseURL                         @"http://stat.mobli.com/"
+
 @interface ConnectorFeedViewController ()
 
 @end
@@ -86,9 +88,16 @@
         cell = [[[GridTableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:@"GridTableViewCell"] autorelease];
     }
     if ([dataSource count] > 0) {
-        [cell setThumb1Image:[dataSource objectAtIndex:row*3]];
-        [cell setThumb2Image:[dataSource objectAtIndex:row*3+1]];
-        [cell setThumb3Image:[dataSource objectAtIndex:row*3+2]];
+        if ([dataSource count] - 1 >= row*3  ) {
+            [cell setThumb1Image:[dataSource objectAtIndex:row*3]];
+        }
+        if ([dataSource count] - 1 >= row*3+1 ) {
+            [cell setThumb2Image:[dataSource objectAtIndex:row*3+1]];
+        }
+        if ([dataSource count] - 1 >= row*3+2  ) {
+            [cell setThumb3Image:[dataSource objectAtIndex:row*3+2]];
+        }
+
     }
     cell.userInteractionEnabled = FALSE;
 
@@ -96,7 +105,7 @@
 }
 
 - (NSInteger)tableView:(UITableView *)aTableView numberOfRowsInSection:(NSInteger)aSection {
-    NSInteger rows = floor([dataSource count]/3);
+    NSInteger rows = ceil([dataSource count]/3);
     return rows;
 }
 
@@ -111,6 +120,8 @@
 - (void)get:(NSString *)resourcePath params:(NSMutableDictionary *)params delegate:(id<MobliRequestDelegate>)delegate {
     leftBarButton.userInteractionEnabled = FALSE;
     leftBarButton.alpha = 0.3;
+    rightBarButton.userInteractionEnabled = FALSE;
+    rightBarButton.alpha = 0.3;
     [UIApplication sharedApplication].networkActivityIndicatorVisible = TRUE;
     [[ConnectorAppDelegate current].mobli get:resourcePath params:params delegate:delegate];
 }
@@ -118,6 +129,8 @@
 - (void)post:(NSString *)resourcePath params:(NSMutableDictionary *)params delegate:(id<MobliRequestDelegate>)delegate {
     leftBarButton.userInteractionEnabled = FALSE;
     leftBarButton.alpha = 0.3;
+    rightBarButton.userInteractionEnabled = FALSE;
+    rightBarButton.alpha = 0.3;
     [UIApplication sharedApplication].networkActivityIndicatorVisible = TRUE;
     [[ConnectorAppDelegate current].mobli post:resourcePath params:params delegate:delegate];
 }
@@ -125,6 +138,8 @@
 - (void)postImage:(UIImage *)image params:(NSMutableDictionary *)params delegate:(id<MobliRequestDelegate>)delegate {
     leftBarButton.userInteractionEnabled = FALSE;
     leftBarButton.alpha = 0.3;
+    rightBarButton.userInteractionEnabled = FALSE;
+    rightBarButton.alpha = 0.3;
     [UIApplication sharedApplication].networkActivityIndicatorVisible = TRUE;
     [[ConnectorAppDelegate current].mobli postImage:image params:params delegate:delegate];
 }
@@ -132,6 +147,8 @@
 - (void)delete:(NSString *)resourcePath delegate:(id<MobliRequestDelegate>)delegate {
     leftBarButton.userInteractionEnabled = FALSE;
     leftBarButton.alpha = 0.3;
+    rightBarButton.userInteractionEnabled = FALSE;
+    rightBarButton.alpha = 0.3;
     [UIApplication sharedApplication].networkActivityIndicatorVisible = TRUE;
     [[ConnectorAppDelegate current].mobli delete:resourcePath delegate:delegate];
 }
@@ -151,10 +168,12 @@
         else {
             thumbId = [NSString stringWithString:[[aPayload objectAtIndex:i]valueForKey:@"id"]];
         }
-        NSString *thumbUrlString = [NSString stringWithFormat:@"%@thumbs/thumb_%@_200.jpg",kMobliCDNDomain,thumbId];
+        NSString *thumbUrlString = [NSString stringWithFormat:@"%@thumbs/thumb_%@_200.jpg",kMobliCDNBaseURL,thumbId];
         NSURL *thumbUrl = [NSURL URLWithString:thumbUrlString];
         NSData *thumbData = [NSData dataWithContentsOfURL:thumbUrl];
-        [dataSource addObject:[UIImage imageWithData:thumbData]];
+        if (thumbData) {
+            [dataSource addObject:[UIImage imageWithData:thumbData]];
+        }
         float progress = (float)i/(count-1);
         NSNumber *floatNum = [NSNumber numberWithFloat:progress];
         [self performSelectorOnMainThread:@selector(updateProgress:) withObject:floatNum waitUntilDone:FALSE];
@@ -165,9 +184,11 @@
 
 - (void)fadeInTable {
     leftBarButton.userInteractionEnabled = TRUE;
+    rightBarButton.userInteractionEnabled = TRUE;
     [UIView animateWithDuration:0.3 animations:^{
         progressView.alpha = 0.0;
         leftBarButton.alpha = 1.0;
+        rightBarButton.alpha = 1.0;
     } completion:^(BOOL finished) {
         tableView.userInteractionEnabled = TRUE;
         [tableView reloadData];
@@ -181,24 +202,30 @@
 
 - (void)requestLoading:(MobliRequest *)aRequest {
     tableView.userInteractionEnabled = FALSE;
+    rightBarButton.userInteractionEnabled = FALSE;
+    leftBarButton.userInteractionEnabled = FALSE;
+
 }
 
 - (void)request:(MobliRequest *)aRequest didLoad:(id)aResult {
     [UIApplication sharedApplication].networkActivityIndicatorVisible = FALSE;
     NSArray *payload = [aResult valueForKey:@"payload"];
-    
     // run getThumbsFromPayload on background thread because we want to update the UI during
     [NSThread detachNewThreadSelector:@selector(getThumbsFromPayload:) toTarget:self withObject:payload];
 }
 
 - (void)request:(MobliRequest *)request didFailWithError:(NSError *)error {
     leftBarButton.userInteractionEnabled = TRUE;
+    rightBarButton.userInteractionEnabled = TRUE;
+
     leftBarButton.alpha = 1.0;
+    rightBarButton.alpha = 1.0;
+    
     tableView.userInteractionEnabled = TRUE;
     [UIApplication sharedApplication].networkActivityIndicatorVisible = FALSE;
 
     // Make sure you handle this error properly
-    NSString *alertTitle = [NSString stringWithFormat: @"Error code %i",[error code]];
+    NSString *alertTitle = [NSString stringWithFormat: @"Error code %i\n%@",[error code],request.url];
     NSString *alertMessage = [NSString stringWithFormat:@"%@",[error userInfo]];
     UIAlertView *errorAlert = [[UIAlertView alloc] initWithTitle:alertTitle
                                                          message:alertMessage 

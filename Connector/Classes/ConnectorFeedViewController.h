@@ -9,7 +9,6 @@
 #import <UIKit/UIKit.h>
 #import "GridTableViewCell.h"
 #import <QuartzCore/QuartzCore.h>
-#import "MobliConnect.h"
 
 @interface ConnectorFeedViewController : UIViewController <UITableViewDataSource, UITableViewDelegate, MobliRequestDelegate>
 
