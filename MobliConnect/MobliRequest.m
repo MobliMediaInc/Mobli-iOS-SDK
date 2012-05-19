@@ -39,13 +39,13 @@ static const NSTimeInterval kTimeoutInterval = 180.0;
 @implementation MobliRequest
 
 @synthesize delegate =                          _delegate,
-            url =                               _url,
-            httpMethod =                        _httpMethod,
-            params =                            _params,
-            connection =                        _connection,
-            responseText =                      _responseText,
-            requestName =                       _requestName,
-            error                               = _error;
+url =                               _url,
+httpMethod =                        _httpMethod,
+params =                            _params,
+connection =                        _connection,
+responseText =                      _responseText,
+requestName =                       _requestName,
+error                               = _error;
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 // class public
@@ -200,11 +200,19 @@ static const NSTimeInterval kTimeoutInterval = 180.0;
     
     SBJsonParser *jsonParser = [[SBJsonParser new] autorelease];
     id result = [jsonParser objectWithString:responseString];
-    id successRaw = [result valueForKey:@"success"];
-    id payLoad = [result valueForKey:@"payload"];
-    id userInfo = [payLoad valueForKey:@"userInfo"];
-    if (successRaw !=nil && [successRaw boolValue] == FALSE) {
-        *error = [NSError errorWithDomain:kMobliRestserverBaseURL code:[[payLoad valueForKey:@"code"] integerValue] userInfo:userInfo];  
+    if (result == nil) {
+        *error = [NSError errorWithDomain:kMobliRestserverBaseURL code:-1 userInfo:[NSDictionary dictionaryWithObjectsAndKeys:@"JSON Corrupted", NSLocalizedDescriptionKey, nil]];  
+    }
+    else {
+        id successRaw = [result valueForKey:@"success"];
+        id payLoad = [result valueForKey:@"payload"];
+        id userInfo = [payLoad valueForKey:@"userInfo"];
+        if (![userInfo isKindOfClass:[NSDictionary class]]) {
+            userInfo = [NSDictionary dictionaryWithObjectsAndKeys:userInfo, NSLocalizedDescriptionKey, nil];
+        }
+        if (successRaw !=nil && [successRaw boolValue] == FALSE) {
+            *error = [NSError errorWithDomain:kMobliRestserverBaseURL code:[[payLoad valueForKey:@"code"] integerValue] userInfo:userInfo];  
+        }
     }
     return result;
 }
@@ -233,11 +241,6 @@ static const NSTimeInterval kTimeoutInterval = 180.0;
          @selector(request:didFailWithError:)]) {
             NSError* error = nil;
             id result = [self parseJsonResponse:data error:&error];
-            id payLoad = [result valueForKey:@"payload"];
-            id userInfo = [payLoad valueForKey:@"userInfo"];
-            if (![userInfo isKindOfClass:[NSDictionary class]]) {
-                userInfo = [NSDictionary dictionaryWithObjectsAndKeys:userInfo, NSLocalizedDescriptionKey, nil];
-            }
             if (error) {
                 [self failWithError:error];
             } else if ([_delegate respondsToSelector:

@@ -47,7 +47,7 @@
                                               geo_lat,    @"geo_lat",
                                               geo_long,   @"geo_long",
                                               nil];
-    [self get:@"nearby" params:nearbyMediaParams delegate:self];
+    [self get:@"explore/nearby" params:nearbyMediaParams delegate:self];
 }
 
 
