@@ -243,8 +243,13 @@ error                               = _error;
             id result = [self parseJsonResponse:data error:&error];
             if (error) {
                 [self failWithError:error];
-            } else if ([_delegate respondsToSelector:
-                        @selector(request:didLoad:)]) {
+            }
+            else if ([result objectForKey:@"error"]) {
+                error = [NSError errorWithDomain:@"Mobli" code:10000 userInfo:result];
+                [self failWithError:error];
+            }
+            else if ([_delegate respondsToSelector:
+                      @selector(request:didLoad:)]) {
                 [_delegate request:self didLoad:(result == nil ? data : result)];
             }
         }
