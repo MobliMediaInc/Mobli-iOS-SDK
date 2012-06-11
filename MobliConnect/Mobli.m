@@ -512,6 +512,9 @@
     if (!params) {
         params = [NSMutableDictionary dictionary];
     }
+    else {
+        params = [NSMutableDictionary dictionaryWithDictionary:params];
+    }
     
     [params setValue:imgForUpload   forKey:@"file"];
     [params setValue:@"photo"       forKey:@"type"];
